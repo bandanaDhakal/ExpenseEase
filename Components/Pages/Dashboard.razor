@@ -1,0 +1,151 @@
+﻿@page "/"
+@using ExpenseEase.Models
+@inject NavigationManager NavigationManager
+@inject UserService UserService
+
+<div class="dashboard-container">
+    <!-- Sidebar Section -->
+    <aside class="sidebar">
+        <h2>ExpenseEase</h2>
+        <nav class="menu">
+            <a href="/" class="menu-item active">Dashboard</a>
+            <a href="/transactions" class="menu-item">Transactions</a>
+            <a href="#" class="menu-item">Outflows</a>
+            <a href="#" class="menu-item">Inflows</a>
+            <a href="/debts" class="menu-item">Debts</a>
+        </nav>
+        <button class="logout-btn" @onclick="Logout">Logout</button>
+    </aside>
+
+    <main class="main-content">
+        <header class="header">
+            <input type="text" class="search-bar" placeholder="Search transactions..." @oninput="FilterTransactions" />
+
+            <!-- Date Range Filters -->
+            <div class="date-filters">
+                <input type="date" @bind="startDate" />
+                <input type="date" @bind="endDate" />
+                <button class="filter-btn" @onclick="FilterByDateRange">Filter</button>
+            </div>
+        </header>
+
+        <!-- Dashboard Highlights -->
+        <section class="dashboard-highlights">
+            <div class="highlight">
+                <h3>Total Transactions</h3>
+                <p>@Data.Transactions.Count</p>
+            </div>
+            <div class="highlight">
+                <h3>Total Balance</h3>
+                <p>@(Data.Transactions.Sum(t => t.Credit) - Data.Transactions.Sum(t => t.Debit))</p>
+            </div>
+            <div class="highlight">
+                <h3>Highest Inflow</h3>
+                <p>@highestInflow</p>
+            </div>
+            <div class="highlight">
+                <h3>Highest Outflow</h3>
+                <p>@highestOutflow</p>
+            </div>
+        </section>
+
+        <!-- Pending Debts -->
+        <section class="pending-debts">
+            <h2>Pending Debts</h2>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Remaining Debt</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var debt in pendingDebts)
+                    {
+                        <tr>
+                            <td>@Data.Users.FirstOrDefault(u => u.Id == debt.UserId)?.Name</td>
+                            <td>@(debt.Amount - debt.PaidAmount)</td>
+                            <td>@debt.Description</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Transactions Table -->
+        <section class="transactions">
+            <h2>Transactions</h2>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Debit</th>
+                        <th>Credit</th>
+                        <th>Date</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var transaction in filteredTransactions)
+                    {
+                        <tr>
+                            <td>@transaction.Id</td>
+                            <td>@transaction.Debit</td>
+                            <td>@transaction.Credit</td>
+                            <td>@transaction.Date.ToString("MM/dd/yyyy")</td>
+                            <td>@transaction.Description</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </section>
+    </main>
+</div>
+
+@code {
+    private AppData Data;
+    private List<Transaction> filteredTransactions;
+    private List<Debt> pendingDebts;
+    private decimal highestInflow;
+    private decimal highestOutflow;
+
+    // Date range fields
+    private DateTime? startDate;
+    private DateTime? endDate;
+    private string searchQuery = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        Data = UserService.LoadData();
+        filteredTransactions = Data.Transactions;
+
+        highestInflow = Data.Transactions.Max(t => t.Credit);
+        highestOutflow = Data.Transactions.Max(t => t.Debit);
+
+        pendingDebts = Data.Debts.Where(d => d.Amount > d.PaidAmount).ToList();
+    }
+
+    private void FilterByDateRange()
+    {
+        // Filter transactions by date range and search query
+        filteredTransactions = Data.Transactions
+            .Where(t =>
+                (string.IsNullOrEmpty(searchQuery) || t.Description.ToLower().Contains(searchQuery)) &&
+                (!startDate.HasValue || t.Date >= startDate) &&
+                (!endDate.HasValue || t.Date <= endDate))
+            .ToList();
+    }
+
+    private void FilterTransactions(ChangeEventArgs e)
+    {
+        // Update search query and reapply filters
+        searchQuery = e.Value?.ToString().ToLower() ?? string.Empty;
+        FilterByDateRange();
+    }
+
+    private void Logout()
+    {
+        NavigationManager.NavigateTo("/login");
+    }
+}

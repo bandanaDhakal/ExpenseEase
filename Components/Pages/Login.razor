@@ -1,0 +1,53 @@
+﻿@page "/login"
+@layout FirstLayout
+@using ExpenseEase.Models
+@using ExpenseEase.Components.Layout
+@inject UserService UserService
+@inject NavigationManager NavigationManager
+
+
+<h3>Login</h3>
+
+<div>
+    <input @bind="LoginUsername" placeholder="Username" />
+    <input @bind="LoginPassword" placeholder="Password" type="password" />
+    <button @onclick="LoginPage">Login</button>
+    <button @onclick="NavigateToRegister">Register</button>
+</div>
+
+@if (!string.IsNullOrEmpty(Message))
+{
+    <p>@Message</p>
+}
+
+@code {
+    private string LoginUsername = "";
+    private string LoginPassword = "";
+    private string Message = "";
+
+    private List<User> Users = new();
+
+    protected override void OnInitialized()
+    {
+        Users = UserService.LoadUsers();
+    }
+
+    private void LoginPage()
+    {
+        var user = Users.FirstOrDefault(u => u.Name == LoginUsername);
+
+        if (user != null && UserService.ValidatePassword(LoginPassword, user.Password))
+        {
+            // Redirect to dashboard if login is successful
+            NavigationManager.NavigateTo("/");
+        }
+        else
+        {
+            Message = "Invalid username or password.";
+        }
+    }
+    private void NavigateToRegister()
+    {
+        NavigationManager.NavigateTo("/register");
+    }
+}

@@ -1,0 +1,105 @@
+﻿.dashboard-container {
+    display: flex;
+    height: 100vh;
+}
+
+.sidebar {
+    background-color: #ffffff;
+    width: 250px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    border-bottom: 1px solid #ddd;
+    border-top: 1px solid #ddd;
+    border-right: 1px solid #ddd;
+    border-left: 1px solid #ddd;
+}
+
+    .sidebar h2 {
+        font-size: 24px;
+        font-weight: bold;
+        color: #4F8D52;
+        margin-bottom: 20px;
+    }
+
+.menu {
+    flex: 1;
+    width: 100%;
+}
+
+.menu-item {
+    display: block;
+    text-decoration: none;
+    padding: 10px 15px;
+    font-size: 16px;
+    color: black;
+    border-radius: 5px;
+    margin-bottom: 10px;
+    transition: background-color 0.3s ease;
+}
+
+    .menu-item:hover,
+    .menu-item.active {
+        background-color: #8DCD90;
+    }
+
+.logout-btn {
+    width: 100%;
+    background-color: #ff4c4c;
+    color: white;
+    border: none;
+    padding: 10px;
+    border-radius: 5px;
+    font-size: 16px;
+    cursor: pointer;
+    margin-top: auto;
+    margin-bottom: 100px;
+}
+
+    .logout-btn:hover {
+        background-color: #e04040;
+    }
+
+.main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    background-color: white;
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+    border-bottom: 1px solid #ddd;
+    border-top: 1px solid #ddd;
+    border-right: 1px solid #ddd;
+}
+
+.search-bar {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    width: 250px;
+}
+
+button.btn {
+    background-color: #4F8D52;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    cursor: pointer;
+    border-radius: 5px;
+    font-size: 1rem;
+    transition: background 0.3s;
+    width: 30%;
+    margin-left: 400px;
+    margin-top: 50px;
+}
+
+    button.btn:hover {
+        background-color: #4d8e4e;
+    }

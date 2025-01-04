@@ -1,0 +1,221 @@
+﻿@page "/transactions"
+@using ExpenseEase.Models
+@inject NavigationManager NavigationManager
+@inject UserService UserService
+
+<div class="dashboard-container">
+    <!-- Sidebar Section -->
+    <aside class="sidebar">
+        <h2>ExpenseEase</h2>
+        <nav class="menu">
+            <a href="/" class="menu-item">Dashboard</a>
+            <a href="/transactions" class="menu-item active">Transactions</a>
+            <a href="#" class="menu-item">Outflows</a>
+            <a href="#" class="menu-item">Inflows</a>
+            <a href="/debts" class="menu-item">Debts</a>
+        </nav>
+        <button class="logout-btn" @onclick="Logout">Logout</button>
+    </aside>
+
+    <div class="main-container">
+        <main class="main-content">
+            <!-- Search and Filter Section -->
+            <h2>Transactions</h2>
+
+            <div class="filter-section">
+                <div>
+                    <label for="transactionType">Type:</label>
+                    <select id="transactionType" @bind="selectedType">
+                        <option value="">All</option>
+                        <option value="debit">Debit</option>
+                        <option value="credit">Credit</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="tagsFilter">Tags:</label>
+                    <input id="tagsFilter" type="text" @bind="filterTagsInput" placeholder="Enter tags separated by commas" />
+                </div>
+
+                <div>
+                    <label for="dateRangeStart">Date Range Start:</label>
+                    <InputDate @bind-Value="dateRangeStart" TValue="DateTime?" id="dateRangeStart" />
+                </div>
+
+                <div>
+                    <label for="dateRangeEnd">Date Range End:</label>
+                    <InputDate @bind-Value="dateRangeEnd" TValue="DateTime?" id="dateRangeEnd" />
+                </div>
+
+                <button @onclick="ApplyFilters" class="button btn-primary">Apply Filters</button>
+            </div>
+
+            <!-- Transaction Table -->
+            <h2>Transactions</h2>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Transaction ID</th>
+                        <th>Main Balance</th>
+                        <th>Debit</th>
+                        <th>Credit</th>
+                        <th>Date</th>
+                        <th>Description</th>
+                        <th>Tags</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var transaction in filteredTransactions)
+                    {
+                        <tr>
+                            <td>@transaction.Id</td>
+                            <td>@(Data.Transactions.Sum(t => t.Credit) - Data.Transactions.Sum(t => t.Debit))</td>
+                            <td>@transaction.Debit</td>
+                            <td>@transaction.Credit</td>
+                            <td>@transaction.Date.ToString("MM/dd/yyyy")</td>
+                            <td>@transaction.Description</td>
+                            <td>@string.Join(", ", transaction.Tags ?? new List<string>())</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            <!-- Balance Warning -->
+            @if (!string.IsNullOrEmpty(balanceWarning))
+            {
+                <div class="alert alert-warning">
+                    @balanceWarning
+                </div>
+            }
+
+            <!-- Add New Transaction Form -->
+            <div class="add-transaction-section">
+                <h2>Add New Transaction</h2>
+                <EditForm Model="newTransaction" OnValidSubmit="HandleTransactionSubmit">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    <div class="form-group">
+                        <label for="debit">Debit</label>
+                        <InputNumber id="debit" @bind-Value="newTransaction.Debit" class="form-control" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="credit">Credit</label>
+                        <InputNumber id="credit" @bind-Value="newTransaction.Credit" class="form-control" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="description">Description</label>
+                        <InputText id="description" @bind-Value="newTransaction.Description" class="form-control" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="tags">Tags</label>
+                        <InputText id="tags" placeholder="Enter tags separated by commas" @bind-Value="tagsInput" class="form-control" />
+                    </div>
+
+                    <div class="form-group">
+                        <button type="submit" class="btn btn-primary">Add Transaction</button>
+                    </div>
+                </EditForm>
+            </div>
+        </main>
+    </div>
+</div>
+
+@code {
+    private AppData Data;
+    private string tagsInput = string.Empty;
+    private List<Transaction> filteredTransactions;
+    private string searchQuery = string.Empty;
+    private string selectedType = string.Empty;
+    private string filterTagsInput = string.Empty;
+    private DateTime? dateRangeStart;
+    private DateTime? dateRangeEnd;
+    private string balanceWarning = string.Empty; // To store the warning message
+    private Transaction newTransaction = new Transaction(); // Model for new transaction
+
+    protected override void OnInitialized()
+    {
+        Data = UserService.LoadData();
+        filteredTransactions = Data.Transactions;
+    }
+
+    private void ApplyFilters()
+    {
+        filteredTransactions = Data.Transactions;
+        balanceWarning = string.Empty; // Reset any previous warning message
+
+        // Filter by type
+        if (!string.IsNullOrEmpty(selectedType))
+        {
+            filteredTransactions = filteredTransactions.Where(t =>
+                (selectedType == "debit" && t.Debit > 0) || (selectedType == "credit" && t.Credit > 0)).ToList();
+        }
+
+        // Check for sufficient balance on debit transactions
+        if (selectedType == "debit")
+        {
+            decimal totalDebit = filteredTransactions.Sum(t => t.Debit);
+            if (totalDebit > Data.Balance)
+            {
+                balanceWarning = "Insufficient balance for the selected debit transactions.";
+                filteredTransactions = new List<Transaction>(); // Optionally clear the filtered transactions
+            }
+        }
+
+        // Filter by tags
+        if (!string.IsNullOrEmpty(filterTagsInput))
+        {
+            var tags = filterTagsInput.Split(',').Select(tag => tag.Trim()).ToList();
+            filteredTransactions = filteredTransactions
+                .Where(t => t.Tags != null && t.Tags.Any(tag => tags.Contains(tag)))
+                .ToList();
+        }
+
+        // Filter by date range
+        if (dateRangeStart.HasValue)
+        {
+            filteredTransactions = filteredTransactions
+                .Where(t => t.Date >= dateRangeStart.Value).ToList();
+        }
+
+        if (dateRangeEnd.HasValue)
+        {
+            filteredTransactions = filteredTransactions
+                .Where(t => t.Date <= dateRangeEnd.Value).ToList();
+        }
+
+        // Search query
+        if (!string.IsNullOrEmpty(searchQuery))
+        {
+            filteredTransactions = filteredTransactions.Where(t =>
+                t.Description.Contains(searchQuery, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+    }
+
+    private void Logout()
+    {
+        NavigationManager.NavigateTo("/login");
+    }
+
+    private void HandleTransactionSubmit()
+    {
+        // Split the input tags into a list of strings
+        newTransaction.Tags = tagsInput.Split(',')
+            .Select(tag => tag.Trim()) // Trim spaces
+            .Where(tag => !string.IsNullOrEmpty(tag)) // Filter out empty tags
+            .ToList();
+
+        newTransaction.Id = Data.Transactions.Count + 1;
+        newTransaction.Date = DateTime.Now;
+        Data.Transactions.Add(newTransaction);
+        UserService.SaveData(Data);
+
+        // Reset form
+        newTransaction = new Transaction();
+        tagsInput = string.Empty; // Clear the tags input
+    }
+}

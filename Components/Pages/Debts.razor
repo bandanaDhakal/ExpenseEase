@@ -1,0 +1,123 @@
+﻿@page "/debts"
+@using ExpenseEase.Models
+@inject UserService UserService
+@inject NavigationManager NavigationManager
+
+<div class="dashboard-container">
+    <!-- Sidebar Section -->
+    <aside class="sidebar">
+        <h2>ExpenseTracker</h2>
+        <nav class="menu">
+            <a href="/" class="menu-item">Dashboard</a>
+            <a href="/transactions" class="menu-item">Transactions</a>
+            <a href="#" class="menu-item">Outflows</a>
+            <a href="#" class="menu-item">Inflows</a>
+            <a href="/debts" class="menu-item active">Debts</a>
+        </nav>
+        <button class="logout-btn" @onclick="Logout">Logout</button>
+    </aside>
+    <main class="main-content">
+        <header class="header">
+            <input type="text" class="search-bar" placeholder="Search..." />
+            @* <div class="user-icon"> *@
+            @*     <img src="user-icon.png" alt="User" /> *@
+            @* </div> *@
+        </header>
+
+
+
+        <!-- Main Content Section -->
+        @* <main class="main-content"> *@
+        @*     <h1>User Debts</h1> *@
+
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Debt ID</th>
+                    <th>User Name</th>
+                    <th>Total Debt</th>
+                    <th>Paid Amount</th>
+                    <th>Remaining Debt</th>
+                    <th>Date</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var debt in Data.Debts)
+                {
+                    <tr>
+                        <td>@debt.Id</td>
+                        <td>@Data.Users.FirstOrDefault(u => u.Id == debt.UserId)?.Name</td>
+                        <td>@debt.Amount</td>
+                        <td>@debt.PaidAmount</td>
+                        <td>@(debt.Amount - debt.PaidAmount)</td>
+                        <td>@debt.Date.ToString("MM/dd/yyyy")</td>
+                        <td>@debt.Description</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <h2>Add New Debt</h2>
+
+        <EditForm Model="newDebt" OnValidSubmit="HandleDebtSubmit">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="form-group">
+                <label for="userId">User</label>
+                <select id="userId" @bind="newDebt.UserId" class="form-control">
+                    @foreach (var user in Data.Users)
+                    {
+                        <option value="@user.Id">@user.Name</option>
+                    }
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="amount">Debt Amount</label>
+                <InputNumber id="amount" @bind-Value="newDebt.Amount" class="form-control" />
+            </div>
+
+            <div class="form-group">
+                <label for="paidAmount">Paid Amount</label>
+                <InputNumber id="paidAmount" @bind-Value="newDebt.PaidAmount" class="form-control" />
+            </div>
+
+            <div class="form-group">
+                <label for="description">Description</label>
+                <InputText id="description" @bind-Value="newDebt.Description" class="form-control" />
+            </div>
+
+            <div class="form-group">
+                <button type="submit" class="btn btn-primary">Add Debt</button>
+            </div>
+        </EditForm>
+    </main>
+</div>
+
+@code {
+    private AppData Data;
+    private Debt newDebt = new Debt();
+
+    protected override void OnInitialized()
+    {
+        Data = UserService.LoadData();
+    }
+
+    private void HandleDebtSubmit()
+    {
+        newDebt.Id = Data.Debts.Count + 1;
+        newDebt.Date = DateTime.Now;
+        Data.Debts.Add(newDebt);
+        UserService.SaveData(Data);
+
+        // Reset form
+        newDebt = new Debt();
+    }
+
+    private void Logout()
+    {
+        NavigationManager.NavigateTo("/login");
+    }
+}

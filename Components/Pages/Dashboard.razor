@@ -47,6 +47,14 @@
                 <h3>Highest Outflow</h3>
                 <p>@highestOutflow</p>
             </div>
+            <div class="highlight">
+                <h3>Lowest Inflow</h3>
+                <p>@lowestInflow</p>
+            </div>
+            <div class="highlight">
+                <h3>Lowest Outflow</h3>
+                <p>@lowestOutflow</p>
+            </div>
         </section>
 
         <!-- Pending Debts -->
@@ -67,6 +75,36 @@
                             <td>@Data.Users.FirstOrDefault(u => u.Id == debt.UserId)?.Name</td>
                             <td>@(debt.Amount - debt.PaidAmount)</td>
                             <td>@debt.Description</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Lowest Debt Transaction -->
+        <section class="lowest-debt-transaction">
+            <h2>Lowest Debt Transaction</h2>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Remaining Debt</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (lowestDebtTransaction != null)
+                    {
+                        <tr>
+                            <td>@Data.Users.FirstOrDefault(u => u.Id == lowestDebtTransaction.UserId)?.Name</td>
+                            <td>@(lowestDebtTransaction.Amount - lowestDebtTransaction.PaidAmount)</td>
+                            <td>@lowestDebtTransaction.Description</td>
+                        </tr>
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="3">No debt transactions available</td>
                         </tr>
                     }
                 </tbody>
@@ -109,6 +147,9 @@
     private List<Debt> pendingDebts;
     private decimal highestInflow;
     private decimal highestOutflow;
+    private decimal lowestInflow;
+    private decimal lowestOutflow;
+    private Debt? lowestDebtTransaction;
 
     // Date range fields
     private DateTime? startDate;
@@ -120,15 +161,27 @@
         Data = UserService.LoadData();
         filteredTransactions = Data.Transactions;
 
-        highestInflow = Data.Transactions.Max(t => t.Credit);
-        highestOutflow = Data.Transactions.Max(t => t.Debit);
+        if (Data.Transactions.Any())
+        {
+            highestInflow = Data.Transactions.Max(t => t.Credit);
+            highestOutflow = Data.Transactions.Max(t => t.Debit);
+            lowestInflow = Data.Transactions.Min(t => t.Credit);
+            lowestOutflow = Data.Transactions.Min(t => t.Debit);
+        }
+        else
+        {
+            highestInflow = 0;
+            highestOutflow = 0;
+            lowestInflow = 0;
+            lowestOutflow = 0;
+        }
 
         pendingDebts = Data.Debts.Where(d => d.Amount > d.PaidAmount).ToList();
+        lowestDebtTransaction = pendingDebts.OrderBy(d => d.Amount - d.PaidAmount).FirstOrDefault();
     }
 
     private void FilterByDateRange()
     {
-        // Filter transactions by date range and search query
         filteredTransactions = Data.Transactions
             .Where(t =>
                 (string.IsNullOrEmpty(searchQuery) || t.Description.ToLower().Contains(searchQuery)) &&
@@ -139,7 +192,6 @@
 
     private void FilterTransactions(ChangeEventArgs e)
     {
-        // Update search query and reapply filters
         searchQuery = e.Value?.ToString().ToLower() ?? string.Empty;
         FilterByDateRange();
     }

@@ -6,7 +6,7 @@
 <div class="dashboard-container">
     <!-- Sidebar Section -->
     <aside class="sidebar">
-        <h2>ExpenseEase</h2>
+        <h2>ExpenseTracker</h2>
         <nav class="menu">
             <a href="/" class="menu-item">Dashboard</a>
             <a href="/transactions" class="menu-item active">Transactions</a>
@@ -47,7 +47,15 @@
                     <InputDate @bind-Value="dateRangeEnd" TValue="DateTime?" id="dateRangeEnd" />
                 </div>
 
-                <button @onclick="ApplyFilters" class="button btn-primary">Apply Filters</button>
+                <div>
+                    <label for="sortOrder">Sort Order:</label>
+                    <select id="sortOrder" @bind="sortOrder">
+                        <option value="ascending">Oldest to Newest</option>
+                        <option value="descending">Newest to Oldest</option>
+                    </select>
+                </div>
+
+                <button @onclick="ApplyFilters" class="btn btn-primary">Apply Filters</button>
             </div>
 
             <!-- Transaction Table -->
@@ -95,6 +103,7 @@
                     <DataAnnotationsValidator />
                     <ValidationSummary />
 
+
                     <div class="form-group">
                         <label for="debit">Debit</label>
                         <InputNumber id="debit" @bind-Value="newTransaction.Debit" class="form-control" />
@@ -128,23 +137,23 @@
     private AppData Data;
     private string tagsInput = string.Empty;
     private List<Transaction> filteredTransactions;
-    private string searchQuery = string.Empty;
     private string selectedType = string.Empty;
     private string filterTagsInput = string.Empty;
     private DateTime? dateRangeStart;
     private DateTime? dateRangeEnd;
     private string balanceWarning = string.Empty; // To store the warning message
     private Transaction newTransaction = new Transaction(); // Model for new transaction
+    private string sortOrder = "ascending"; // Default sorting order
 
     protected override void OnInitialized()
     {
         Data = UserService.LoadData();
-        filteredTransactions = Data.Transactions;
+        filteredTransactions = Data.Transactions.ToList(); // Ensure it's a fresh copy
     }
 
     private void ApplyFilters()
     {
-        filteredTransactions = Data.Transactions;
+        filteredTransactions = Data.Transactions.ToList(); // Start with all transactions
         balanceWarning = string.Empty; // Reset any previous warning message
 
         // Filter by type
@@ -187,12 +196,14 @@
                 .Where(t => t.Date <= dateRangeEnd.Value).ToList();
         }
 
-        // Search query
-        if (!string.IsNullOrEmpty(searchQuery))
+        // Apply sorting
+        if (sortOrder == "ascending")
         {
-            filteredTransactions = filteredTransactions.Where(t =>
-                t.Description.Contains(searchQuery, StringComparison.OrdinalIgnoreCase))
-                .ToList();
+            filteredTransactions = filteredTransactions.OrderBy(t => t.Date).ToList();
+        }
+        else
+        {
+            filteredTransactions = filteredTransactions.OrderByDescending(t => t.Date).ToList();
         }
     }
 

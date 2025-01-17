@@ -1,27 +1,35 @@
 ﻿@page "/register"
-@using ExpenseEase.Models
 @using ExpenseEase.Components.Layout
-@inject UserService UserService
+@using ExpenseEase.Models
 @layout FirstLayout
+@inject UserService UserService
 @inject NavigationManager NavigationManager
 
-<h3>Register</h3>
-
-<div>
-    <input @bind="RegisterUsername" placeholder="Username" />
-    <input @bind="RegisterPassword" placeholder="Password" type="password" />
-    <input @bind="RegisterEmail" placeholder="Email" />
-    <button @onclick="RegisterPage">Register</button>
+<div class="signup-container">
+    <div class="signup-box">
+        <h3>Sign Up!</h3>
+        <form class="signup-form">
+            <input @bind="RegisterUsername" placeholder="Name" class="input-field" />
+            <input @bind="RegisterEmail" placeholder="Email" class="input-field" type="email" />
+            <input @bind="RegisterPassword" placeholder="Password" type="password" class="input-field" />
+            <input @bind="ConfirmPassword" placeholder="Confirm Password" type="password" class="input-field" />
+            <button type="button" @onclick="RegisterPage" class="btn">Sign up</button>
+        </form>
+        <p>Already have an account? <a href="/login" class="link">Log in</a></p>
+        @if (!string.IsNullOrEmpty(Message))
+        {
+            <p class="error-message">@Message</p>
+        }
+    </div>
+    <div class="img-content">
+        <img src="images/background.png" alt="Budget and calculator" class="signup-image" />
+    </div>
 </div>
-
-@if (!string.IsNullOrEmpty(Message))
-{
-    <p>@Message</p>
-}
 
 @code {
     private string RegisterUsername = "";
     private string RegisterPassword = "";
+    private string ConfirmPassword = "";
     private string RegisterEmail = "";
     private string Message = "";
 
@@ -40,17 +48,26 @@
             return;
         }
 
-        if (Users.Any(u => u.Name == RegisterUsername))
+        // Check if the username already exists
+        var existingUser = Users.FirstOrDefault(u => u.Name == RegisterUsername);
+        if (existingUser != null)
         {
             Message = "Username already exists.";
             return;
         }
 
-        // Create new user and hash the password
+        // Check if passwords match
+        if (RegisterPassword != ConfirmPassword)
+        {
+            Message = "Passwords do not match.";
+            return;
+        }
+
+        // If validation passes, register the new user
         var newUser = new User
             {
                 Name = RegisterUsername,
-                Password = UserService.HashPassword(RegisterPassword),  // Hash the password
+                Password = UserService.HashPassword(RegisterPassword),
                 Email = RegisterEmail
             };
 

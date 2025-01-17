@@ -1,29 +1,42 @@
 ﻿@page "/login"
+@using ExpenseEase.Components.Layout
 @layout FirstLayout
 @using ExpenseEase.Models
-@using ExpenseEase.Components.Layout
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
 @inject UserService UserService
 @inject NavigationManager NavigationManager
 
-
-<h3>Login</h3>
-
-<div>
-    <input @bind="LoginUsername" placeholder="Username" />
-    <input @bind="LoginPassword" placeholder="Password" type="password" />
-    <button @onclick="LoginPage">Login</button>
-    <button @onclick="NavigateToRegister">Register</button>
+<div class="login-container">
+    <div class="login-box">
+        <h3>Log In!</h3>
+        <form class="login-form">
+            <input @bind="LoginUsername" placeholder="Username" class="input-field" />
+            <input @bind="LoginPassword" placeholder="Password" type="password" class="input-field" />
+            <select @bind="SelectedCurrency" class="input-field">
+                <option value="" disabled selected>Currency Type</option>
+                <option value="USD">USD</option>
+                <option value="NPR">NPR</option>
+            </select>
+            <button type="button" @onclick="async () => await ValidateForm()" class="btn">Log In</button>
+        </form>
+        <p>Don't have an account? <a href="/register" class="link">Sign up</a></p>
+        @if (!string.IsNullOrEmpty(Message))
+        {
+            <p class="@MessageClass">@Message</p>
+        }
+    </div>
+    <div class="img-content">
+        <img src="images/background.png" alt="Budget and calculator" class="login-image" />
+    </div>
 </div>
-
-@if (!string.IsNullOrEmpty(Message))
-{
-    <p>@Message</p>
-}
 
 @code {
     private string LoginUsername = "";
     private string LoginPassword = "";
+    private string SelectedCurrency = "";
     private string Message = "";
+    private string MessageClass = ""; // CSS class for styling the message
 
     private List<User> Users = new();
 
@@ -32,22 +45,46 @@
         Users = UserService.LoadUsers();
     }
 
-    private void LoginPage()
+    private async Task ValidateForm()
     {
-        var user = Users.FirstOrDefault(u => u.Name == LoginUsername);
-
-        if (user != null && UserService.ValidatePassword(LoginPassword, user.Password))
+        if (string.IsNullOrEmpty(LoginUsername) || string.IsNullOrEmpty(LoginPassword) || string.IsNullOrEmpty(SelectedCurrency))
         {
-            // Redirect to dashboard if login is successful
-            NavigationManager.NavigateTo("/");
+            Message = "Please fill in all fields.";
+            MessageClass = "error-message";
         }
         else
         {
-            Message = "Invalid username or password.";
+            await LoginPage();
         }
     }
-    private void NavigateToRegister()
+
+    private async Task LoginPage()
     {
-        NavigationManager.NavigateTo("/register");
+        var user = Users.FirstOrDefault(u => u.Name == LoginUsername);
+
+        if (user == null)
+        {
+            // Username not found
+            Message = "Username not found.";
+            MessageClass = "error-message";
+        }
+        else if (UserService.ValidatePassword(LoginPassword, user.Password))
+        {
+            // Successful login
+            Message = "Logged in successfully, redirecting to dashboard...";
+            MessageClass = "success-message";
+
+            // Delay for 2 seconds to show the message before redirection
+            await Task.Delay(2000);
+
+            // Redirect with currency query string
+            NavigationManager.NavigateTo($"/?currency={SelectedCurrency}");
+        }
+        else
+        {
+            // Password mismatch
+            Message = "Password does not match.";
+            MessageClass = "error-message";
+        }
     }
 }

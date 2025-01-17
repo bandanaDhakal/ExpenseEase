@@ -6,120 +6,266 @@
 <div class="dashboard-container">
     <!-- Sidebar Section -->
     <aside class="sidebar">
-        <h2>ExpenseEase</h2>
+        <h2>ExpenseTracker</h2>
         <nav class="menu">
             <a href="/" class="menu-item">Dashboard</a>
             <a href="/transactions" class="menu-item">Transactions</a>
-            <a href="#" class="menu-item">Outflows</a>
-            <a href="#" class="menu-item">Inflows</a>
             <a href="/debts" class="menu-item active">Debts</a>
         </nav>
         <button class="logout-btn" @onclick="Logout">Logout</button>
     </aside>
+
     <main class="main-content">
         <header class="header">
             <input type="text" class="search-bar" placeholder="Search..." />
-            @* <div class="user-icon"> *@
-            @*     <img src="user-icon.png" alt="User" /> *@
-            @* </div> *@
         </header>
 
+        <!-- Filter Section -->
+        <div class="filter-section">
+            <div>
+                <label for="dateRangeStart">Date Range Start:</label>
+                <InputDate @bind-Value="dateRangeStart" TValue="DateTime?" id="dateRangeStart" />
+            </div>
 
+            <div>
+                <label for="dateRangeEnd">Date Range End:</label>
+                <InputDate @bind-Value="dateRangeEnd" TValue="DateTime?" id="dateRangeEnd" />
+            </div>
 
-        <!-- Main Content Section -->
-        @* <main class="main-content"> *@
-        @*     <h1>User Debts</h1> *@
+            <div>
+                <label for="sortOrder">Sort Order:</label>
+                <select id="sortOrder" @bind="sortOrder">
+                    <option value="ascending">Oldest to Newest</option>
+                    <option value="descending">Newest to Oldest</option>
+                </select>
+            </div>
 
+            <button @onclick="ApplyFilters" class="btn btn-primary">Apply Filters</button>
+        </div>
+
+        @if (showDateUnavailablePopup)
+        {
+            <div class="popup-message">
+                <p>No debts found within the specified date range.</p>
+                <button @onclick="CloseDateUnavailablePopup" class="btn btn-close">Close</button>
+            </div>
+        }
+
+        <!-- Debt Table -->
         <table class="table">
             <thead>
                 <tr>
                     <th>Debt ID</th>
                     <th>User Name</th>
-                    <th>Total Debt</th>
-                    <th>Paid Amount</th>
-                    <th>Remaining Debt</th>
+                    <th>Total Debt (@currency)</th>
+                    <th>Paid Amount (@currency)</th>
+                    <th>Remaining Debt (@currency)</th>
                     <th>Date</th>
                     <th>Description</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach (var debt in Data.Debts)
+                @foreach (var debt in filteredDebts)
                 {
-                    <tr>
+                    <tr class="@GetRowClass(debt)">
                         <td>@debt.Id</td>
                         <td>@Data.Users.FirstOrDefault(u => u.Id == debt.UserId)?.Name</td>
-                        <td>@debt.Amount</td>
-                        <td>@debt.PaidAmount</td>
-                        <td>@(debt.Amount - debt.PaidAmount)</td>
+                        <td>@($"{currency} {debt.Amount:F2}")</td>
+                        <td>@($"{currency} {debt.PaidAmount:F2}")</td>
+                        <td>@($"{currency} {(debt.Amount - debt.PaidAmount):F2}")</td>
                         <td>@debt.Date.ToString("MM/dd/yyyy")</td>
                         <td>@debt.Description</td>
+                        <td>
+                            <button class="btn btn-danger" @onclick="() => DeleteDebt(debt.Id)">Delete</button>
+                            <button class="btn btn-success" @onclick="() => OpenClearDebtPopup(debt)">Clear Debt</button>
+                        </td>
                     </tr>
                 }
             </tbody>
         </table>
 
-        <div class="add-debts-section">
-            <h2>Add New Debt</h2>
+        <!-- Add New Debt -->
+        <h2>Add New Debt</h2>
+        <EditForm Model="newDebt" OnValidSubmit="HandleDebtSubmit">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
 
-            <EditForm Model="newDebt" OnValidSubmit="HandleDebtSubmit">
-                <DataAnnotationsValidator />
-                <ValidationSummary />
+            <div class="form-group">
+                <label for="userId">User</label>
+                <select id="userId" @bind="newDebt.UserId" class="form-control">
+                    @foreach (var user in Data.Users)
+                    {
+                        <option value="@user.Id">@user.Name</option>
+                    }
+                </select>
+            </div>
 
-                <div class="form-group">
-                    <label for="userId">User</label>
-                    <select id="userId" @bind="newDebt.UserId" class="form-control">
-                        @foreach (var user in Data.Users)
-                        {
-                            <option value="@user.Id">@user.Name</option>
-                        }
-                    </select>
+            <div class="form-group">
+                <label for="amount">Debt Amount (@currency)</label>
+                <InputNumber id="amount" @bind-Value="newDebt.Amount" class="form-control" />
+            </div>
+
+            <div class="form-group">
+                <label for="paidAmount">Paid Amount (@currency)</label>
+                <InputNumber id="paidAmount" @bind-Value="newDebt.PaidAmount" class="form-control" />
+            </div>
+
+            <div class="form-group">
+                <label for="description">Description</label>
+                <InputText id="description" @bind-Value="newDebt.Description" class="form-control" />
+            </div>
+
+            <div class="form-group">
+                <button type="submit" class="btn btn-primary">Add Debt</button>
+            </div>
+        </EditForm>
+
+        <!-- Clear Debt Popup -->
+        @if (selectedDebt != null)
+        {
+            <div class="popup" style="  background-color: rgba(0, 0, 0, 0.5);position: absolute; top: 10%; left: 50%; transform: translate(-50%, 0);">
+                <div class="popup-content">
+                    <h3>Clear Debt for @Data.Users.FirstOrDefault(u => u.Id == selectedDebt.UserId)?.Name</h3>
+                    <EditForm Model="paymentModel" OnValidSubmit="ClearDebt">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+
+                        <div class="form-group">
+                            <label for="paymentAmount">Payment Amount (@currency):</label>
+                            <InputNumber id="paymentAmount" @bind-Value="paymentModel.PaymentAmount" class="form-control" />
+                        </div>
+
+                        <div class="form-group">
+                            <button type="submit" class="btn btn-primary">Submit Payment</button>
+                            <button type="button" class="btn btn-secondary" @onclick="ClosePopup">Cancel</button>
+                        </div>
+                    </EditForm>
                 </div>
-
-                <div class="form-group">
-                    <label for="amount">Debt Amount</label>
-                    <InputNumber id="amount" @bind-Value="newDebt.Amount" class="form-control" />
-                </div>
-
-                <div class="form-group">
-                    <label for="paidAmount">Paid Amount</label>
-                    <InputNumber id="paidAmount" @bind-Value="newDebt.PaidAmount" class="form-control" />
-                </div>
-
-                <div class="form-group">
-                    <label for="description">Description</label>
-                    <InputText id="description" @bind-Value="newDebt.Description" class="form-control" />
-                </div>
-
-                <div class="form-group">
-                    <button type="submit" class="btn btn-primary">Add Debt</button>
-                </div>
-            </EditForm>
-        </div>
+            </div>
+        }
     </main>
 </div>
 
 @code {
+    private class PaymentModel
+    {
+        public decimal PaymentAmount { get; set; }
+    }
+
     private AppData Data;
     private Debt newDebt = new Debt();
+    private Debt selectedDebt;
+    private string currency = "USD";
+    private PaymentModel paymentModel = new PaymentModel();
+    private bool showDateUnavailablePopup = false;
+    private List<Debt> filteredDebts;
+    private DateTime? dateRangeStart;
+    private DateTime? dateRangeEnd;
+    private string sortOrder = "ascending";
 
     protected override void OnInitialized()
     {
         Data = UserService.LoadData();
+        filteredDebts = Data.Debts.ToList();
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        currency = query["currency"] ?? "USD"; // Fetch currency from query string
     }
 
-    private void HandleDebtSubmit()
+    private async Task HandleDebtSubmit()
     {
         newDebt.Id = Data.Debts.Count + 1;
         newDebt.Date = DateTime.Now;
         Data.Debts.Add(newDebt);
         UserService.SaveData(Data);
 
-        // Reset form
-        newDebt = new Debt();
+        filteredDebts = Data.Debts.ToList();
+    }
+
+    private void DeleteDebt(int debtId)
+    {
+        var debtToDelete = Data.Debts.FirstOrDefault(d => d.Id == debtId);
+        if (debtToDelete != null)
+        {
+            Data.Debts.Remove(debtToDelete);
+            UserService.SaveData(Data);
+        }
+        filteredDebts = Data.Debts.ToList();
+    }
+
+    private void OpenClearDebtPopup(Debt debt)
+    {
+        selectedDebt = debt;
+        paymentModel = new PaymentModel { PaymentAmount = 0 };
+    }
+
+    private async Task ClearDebt()
+    {
+        if (selectedDebt != null && paymentModel.PaymentAmount > 0)
+        {
+            selectedDebt.PaidAmount += paymentModel.PaymentAmount;
+            if (selectedDebt.PaidAmount > selectedDebt.Amount)
+            {
+                selectedDebt.PaidAmount = selectedDebt.Amount;
+            }
+
+            UserService.SaveData(Data);
+            filteredDebts = Data.Debts.ToList();
+            ClosePopup();
+        }
+    }
+
+    private void ClosePopup()
+    {
+        selectedDebt = null;
+    }
+
+    private void CloseDateUnavailablePopup()
+    {
+        showDateUnavailablePopup = false;
+    }
+
+    private void ApplyFilters()
+    {
+        filteredDebts = Data.Debts.ToList();
+
+        if (dateRangeStart.HasValue)
+        {
+            filteredDebts = filteredDebts.Where(d => d.Date >= dateRangeStart.Value).ToList();
+        }
+
+        if (dateRangeEnd.HasValue)
+        {
+            filteredDebts = filteredDebts.Where(d => d.Date <= dateRangeEnd.Value).ToList();
+        }
+
+        if (!filteredDebts.Any())
+        {
+            showDateUnavailablePopup = true;
+        }
+        else
+        {
+            showDateUnavailablePopup = false;
+        }
+
+        if (sortOrder == "ascending")
+        {
+            filteredDebts = filteredDebts.OrderBy(d => d.Date).ToList();
+        }
+        else
+        {
+            filteredDebts = filteredDebts.OrderByDescending(d => d.Date).ToList();
+        }
     }
 
     private void Logout()
     {
         NavigationManager.NavigateTo("/login");
+    }
+
+    private string GetRowClass(Debt debt)
+    {
+        return debt.Amount - debt.PaidAmount == 0 ? "row-paid" : "row-pending";
     }
 }

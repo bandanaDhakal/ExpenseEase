@@ -6,12 +6,10 @@
 <div class="dashboard-container">
     <!-- Sidebar Section -->
     <aside class="sidebar">
-        <h2>ExpenseEase</h2>
+        <h2>ExpenseTracker</h2>
         <nav class="menu">
             <a href="/" class="menu-item active">Dashboard</a>
             <a href="/transactions" class="menu-item">Transactions</a>
-            <a href="#" class="menu-item">Outflows</a>
-            <a href="#" class="menu-item">Inflows</a>
             <a href="/debts" class="menu-item">Debts</a>
         </nav>
         <button class="logout-btn" @onclick="Logout">Logout</button>
@@ -19,7 +17,7 @@
 
     <main class="main-content">
         <header class="header">
-            <input type="text" class="search-bar" placeholder="Search transactions..." @oninput="FilterTransactions" />
+            <input type="text" class="search-bar" placeholder="Search by amount..." @oninput="FilterTransactions" />
 
             <!-- Date Range Filters -->
             <div class="date-filters">
@@ -37,23 +35,27 @@
             </div>
             <div class="highlight">
                 <h3>Total Balance</h3>
-                <p>@(Data.Transactions.Sum(t => t.Credit) - Data.Transactions.Sum(t => t.Debit))</p>
+                <p>@(Data.Transactions.Sum(t => t.Credit) - Data.Transactions.Sum(t => t.Debit)) @Currency</p> <!-- Display currency -->
             </div>
             <div class="highlight">
                 <h3>Highest Inflow</h3>
-                <p>@highestInflow</p>
+                <p>@highestInflow @Currency</p> <!-- Display currency -->
             </div>
             <div class="highlight">
                 <h3>Highest Outflow</h3>
-                <p>@highestOutflow</p>
+                <p>@highestOutflow @Currency</p> <!-- Display currency -->
             </div>
             <div class="highlight">
                 <h3>Lowest Inflow</h3>
-                <p>@lowestInflow</p>
+                <p>@lowestInflow @Currency</p> <!-- Display currency -->
             </div>
             <div class="highlight">
                 <h3>Lowest Outflow</h3>
-                <p>@lowestOutflow</p>
+                <p>@lowestOutflow @Currency</p> <!-- Display currency -->
+            </div>
+            <div class="highlight">
+                <h3>Remaining Debt</h3>
+                <p>@remainingDebt @Currency</p> <!-- Display currency -->
             </div>
         </section>
 
@@ -73,38 +75,8 @@
                     {
                         <tr>
                             <td>@Data.Users.FirstOrDefault(u => u.Id == debt.UserId)?.Name</td>
-                            <td>@(debt.Amount - debt.PaidAmount)</td>
+                            <td>@(debt.Amount - debt.PaidAmount) @Currency</td> <!-- Display currency -->
                             <td>@debt.Description</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </section>
-
-        <!-- Lowest Debt Transaction -->
-        <section class="lowest-debt-transaction">
-            <h2>Lowest Debt Transaction</h2>
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>User</th>
-                        <th>Remaining Debt</th>
-                        <th>Description</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @if (lowestDebtTransaction != null)
-                    {
-                        <tr>
-                            <td>@Data.Users.FirstOrDefault(u => u.Id == lowestDebtTransaction.UserId)?.Name</td>
-                            <td>@(lowestDebtTransaction.Amount - lowestDebtTransaction.PaidAmount)</td>
-                            <td>@lowestDebtTransaction.Description</td>
-                        </tr>
-                    }
-                    else
-                    {
-                        <tr>
-                            <td colspan="3">No debt transactions available</td>
                         </tr>
                     }
                 </tbody>
@@ -129,8 +101,8 @@
                     {
                         <tr>
                             <td>@transaction.Id</td>
-                            <td>@transaction.Debit</td>
-                            <td>@transaction.Credit</td>
+                            <td>@transaction.Debit @Currency</td> <!-- Display currency -->
+                            <td>@transaction.Credit @Currency</td> <!-- Display currency -->
                             <td>@transaction.Date.ToString("MM/dd/yyyy")</td>
                             <td>@transaction.Description</td>
                         </tr>
@@ -138,6 +110,17 @@
                 </tbody>
             </table>
         </section>
+
+        <!-- Popup Modal for No Matching Transactions -->
+        @if (showPopup)
+        {
+            <div class="popup-modal">
+                <div class="popup-content">
+                    <p>@dateErrorMessage</p>
+                    <button @onclick="ClosePopup">Close</button>
+                </div>
+            </div>
+        }
     </main>
 </div>
 
@@ -149,17 +132,33 @@
     private decimal highestOutflow;
     private decimal lowestInflow;
     private decimal lowestOutflow;
+    private decimal remainingDebt;
     private Debt? lowestDebtTransaction;
+    private string Currency = "USD"; // Default currency
 
     // Date range fields
     private DateTime? startDate;
     private DateTime? endDate;
     private string searchQuery = string.Empty;
+    private decimal? amountSearchQuery;
+
+
+    private string amountErrorMessage;
+    private string dateErrorMessage;
+    private bool showPopup = false;
 
     protected override void OnInitialized()
     {
         Data = UserService.LoadData();
         filteredTransactions = Data.Transactions;
+        UpdateCurrencyFromQuery();
+        // UpdateDashboardData();
+
+        // Get the currency from the query string
+        // var uri = NavigationManager.Uri;
+        // var queryParams = new Uri(uri).Query;
+        // var queryDictionary = System.Web.HttpUtility.ParseQueryString(queryParams);
+        // Currency = queryDictionary["currency"] ?? "USD"; Default to USD if no currency is passed
 
         if (Data.Transactions.Any())
         {
@@ -176,28 +175,74 @@
             lowestOutflow = 0;
         }
 
+        // Calculating Remaining Debt
+        remainingDebt = Data.Debts.Where(d => d.Amount > d.PaidAmount).Sum(d => d.Amount - d.PaidAmount);
+
         pendingDebts = Data.Debts.Where(d => d.Amount > d.PaidAmount).ToList();
         lowestDebtTransaction = pendingDebts.OrderBy(d => d.Amount - d.PaidAmount).FirstOrDefault();
     }
+    protected override void OnParametersSet()
+    {
+        UpdateCurrencyFromQuery();
+        // UpdateDashboardData();
+    }
+
+    private void UpdateCurrencyFromQuery()
+    {
+        var uri = NavigationManager.Uri;
+        var queryParams = new Uri(uri).Query;
+        var queryDictionary = System.Web.HttpUtility.ParseQueryString(queryParams);
+        Currency = queryDictionary["currency"] ?? "USD"; // Default to USD if no currency is passed
+    }
+
+
 
     private void FilterByDateRange()
     {
         filteredTransactions = Data.Transactions
             .Where(t =>
-                (string.IsNullOrEmpty(searchQuery) || t.Description.ToLower().Contains(searchQuery)) &&
+                (!amountSearchQuery.HasValue || t.Debit == amountSearchQuery || t.Credit == amountSearchQuery) &&
                 (!startDate.HasValue || t.Date >= startDate) &&
                 (!endDate.HasValue || t.Date <= endDate))
             .ToList();
+
+        // Show alert if no transactions match the selected date range
+        if (!filteredTransactions.Any())
+        {
+            dateErrorMessage = "No transactions found !";
+            showPopup = true;
+            StateHasChanged();
+        }
+        else
+        {
+            dateErrorMessage = string.Empty;
+            showPopup = false; // Hide popup
+        }
     }
 
     private void FilterTransactions(ChangeEventArgs e)
     {
-        searchQuery = e.Value?.ToString().ToLower() ?? string.Empty;
+        if (decimal.TryParse(e.Value?.ToString(), out var amount))
+        {
+            amountSearchQuery = amount;
+            amountErrorMessage = string.Empty; // Reset error message
+        }
+        else
+        {
+            amountSearchQuery = null;
+            amountErrorMessage = "Amount not found!";
+        }
+
         FilterByDateRange();
     }
 
     private void Logout()
     {
         NavigationManager.NavigateTo("/login");
+    }
+
+    private void ClosePopup()
+    {
+        showPopup = false;
     }
 }
